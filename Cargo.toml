@@ -1,0 +1,26 @@
+[package]
+name = "learn-opengl"
+description = "OpenGL tutorials for Rust"
+repository = "https://github.com/rust-tutorials/learn-opengl"
+version = "0.0.1-alpha.0"
+authors = ["Lokathor <zefria@gmail.com>"]
+edition = "2018"
+license = "Zlib"
+
+publish = false
+
+[dependencies]
+bytemuck = "1"
+gl33 = "0.2.1"
+ultraviolet = "0.9.2"
+
+# these should be dev dependencies, but i use the bin directory
+# during dev so they live here, except during a crates.io release
+beryllium = "0.13"
+fermium = "22605.0.0"
+nalgebra-glm = "0.18.0"
+imagine = "0.5.1"
+
+image = "0.24.7"
+
+[dev-dependencies]
