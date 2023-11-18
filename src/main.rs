@@ -283,14 +283,14 @@ fn poll_events(sdl: &Sdl, image: &mut RotImage, controller: &mut CameraControlle
                         -fov_scale_amount
                     };
                 }
-                SLDK_r => {
+                SDLK_LEFTBRACKET | SDLK_r => {
                     controller.zoom -= if pressed {
                         zoom_scale_amount
                     } else {
                         -zoom_scale_amount
                     };
                 }
-                SDLK_f => {
+                SDLK_RIGHTBRACKET | SDLK_f => {
                     controller.zoom += if pressed {
                         zoom_scale_amount
                     } else {
