@@ -1,5 +1,3 @@
-const WINDOW_TITLE: &str = "";
-
 use beryllium::{
     events::Event,
     init::InitFlags,
@@ -27,9 +25,24 @@ struct RotImage {
     viewrays: [Vertex; 4],
     fov: f32,
     camera_rot: [f32; 2],
-    camera_rot_amount: f32,
     source_fov: f32,
+}
+
+struct CameraController {
+    rot_direction: [f32; 2],
+    fov_scale: f32,
+    camera_rot_amount: f32,
     fov_scale_amount: f32,
+}
+impl Default for CameraController {
+    fn default() -> Self {
+        Self {
+            rot_direction: [0.0, 0.0],
+            fov_scale: 0.0,
+            camera_rot_amount: 0.03,
+            fov_scale_amount: 0.05,
+        }
+    }
 }
 
 impl Default for RotImage {
@@ -43,9 +56,7 @@ impl Default for RotImage {
             ],
             fov: PI / 2.0,
             camera_rot: [0., 0.],
-            camera_rot_amount: 0.1,
             source_fov: 2. * PI,
-            fov_scale_amount: 0.1,
         }
     }
 }
@@ -77,7 +88,11 @@ impl RotImage {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = args[1].as_str();
-    let source_fov = if args[2] == "360" { 2. * PI } else { PI };
+    let source_fov: f32 = args[2]
+        .parse::<f32>()
+        .expect("Invalid input for source field of view!")
+        * PI
+        / 180.;
     // Setup the window
     let sdl = Sdl::init(InitFlags::EVERYTHING);
     sdl.set_gl_profile(GlProfile::Core).unwrap();
@@ -159,8 +174,9 @@ fn main() {
         glEnable(GL_BLEND);
     }
     let scalar_location = get_shader_variable("scalar", shader_program.0);
+    let mut controller: CameraController = Default::default();
     loop {
-        let (update_camera, exit) = poll_events(&sdl, &mut image);
+        let (update_camera, exit) = poll_events(&sdl, &mut image, &mut controller);
         if exit {
             break;
         }
@@ -201,11 +217,9 @@ fn get_shader_variable(str: &str, program_id: u32) -> i32 {
     }
 }
 
-fn poll_events(sdl: &Sdl, image: &mut RotImage) -> (bool, bool) {
-    let rot_amount = image.camera_rot_amount;
-    let fov_scale_amount = image.fov_scale_amount;
-    let mut rot_delta: [f32; 2] = [0., 0.];
-    let mut fov_delta: f32 = 0.0;
+fn poll_events(sdl: &Sdl, image: &mut RotImage, controller: &mut CameraController) -> (bool, bool) {
+    let rot_amount = controller.camera_rot_amount;
+    let fov_scale_amount = controller.fov_scale_amount;
     let mut update_camera = false;
     let mut exit = false;
     while let Some((event, _timestamp)) = sdl.poll_events() {
@@ -215,33 +229,36 @@ fn poll_events(sdl: &Sdl, image: &mut RotImage) -> (bool, bool) {
                 break;
             }
             Event::Key {
-                pressed: true,
+                pressed,
+                repeat: 0,
                 keycode,
                 ..
             } => match keycode {
                 SDLK_LEFT => {
-                    rot_delta[0] += rot_amount;
-                    update_camera = true;
+                    controller.rot_direction[0] += if pressed { rot_amount } else { -rot_amount };
                 }
                 SDLK_RIGHT => {
-                    rot_delta[0] -= rot_amount;
-                    update_camera = true;
+                    controller.rot_direction[0] -= if pressed { rot_amount } else { -rot_amount };
                 }
                 SDLK_UP => {
-                    rot_delta[1] += rot_amount;
-                    update_camera = true;
+                    controller.rot_direction[1] += if pressed { rot_amount } else { -rot_amount };
                 }
                 SDLK_DOWN => {
-                    rot_delta[1] -= rot_amount;
-                    update_camera = true;
+                    controller.rot_direction[1] -= if pressed { rot_amount } else { -rot_amount };
                 }
                 SDLK_e => {
-                    fov_delta -= fov_scale_amount;
-                    update_camera = true;
+                    controller.fov_scale -= if pressed {
+                        fov_scale_amount
+                    } else {
+                        -fov_scale_amount
+                    };
                 }
                 SDLK_q => {
-                    fov_delta += fov_scale_amount;
-                    update_camera = true;
+                    controller.fov_scale += if pressed {
+                        fov_scale_amount
+                    } else {
+                        -fov_scale_amount
+                    };
                 }
                 SDLK_ESCAPE => {
                     exit = true;
@@ -252,9 +269,13 @@ fn poll_events(sdl: &Sdl, image: &mut RotImage) -> (bool, bool) {
             _ => {}
         }
     }
-    if rot_delta[0] != 0.0 || rot_delta[1] != 0.0 || fov_delta != 0.0 {
-        image.fov += fov_delta;
-        image.rotate_viewrays(rot_delta[0], rot_delta[1]);
+    if controller.rot_direction[0] != 0.0
+        || controller.rot_direction[1] != 0.0
+        || fov_scale_amount != 0.0
+    {
+        update_camera = true;
+        image.fov += controller.fov_scale;
+        image.rotate_viewrays(controller.rot_direction[0], controller.rot_direction[1]);
     }
     (update_camera, exit)
 }
