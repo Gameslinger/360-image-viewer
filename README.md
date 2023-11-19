@@ -3,6 +3,8 @@ This is a 360 image viewer written in rust. It allows you to view mirror ball pr
 
 I want to thank [FrostKiwi](https://github.com/FrostKiwi/Mirrorball) for his video on the mirrorball projection and webapp. I studied his code and used his shaders as a starting point for this project.
 
+![Yellowstone](pictures/yellowstone.jpg)
+
 ## Running
 This photo-viewer supports two main options: the image view in degrees and a "twin" option. Passing an angle (e.g. 180, 360) specifies the view from the original image. Using the twin option (t or twin) allows you to view pictures with two 180 degree views. See the examples below for specific examples.
 
