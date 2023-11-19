@@ -28,7 +28,7 @@ void main()
   }
   if(!twin_view && length(iRay_scaled) >= 0.5 && scalar > 1.0)
     gl_FragColor = vec4(0.0,0.0,0.0,1.0);
-  else if(R.z < 0) {
+  else if(twin_view && R.z < 0) {
     uv.x = 0.5 - uv.x;
     uv.x += 0.5;
     gl_FragColor = vec4(texture2D(sample_projection, uv).rgb, 1.0);

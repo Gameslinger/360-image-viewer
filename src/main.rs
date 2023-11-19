@@ -31,23 +31,105 @@ struct RotImage {
 }
 
 struct CameraController {
-    rot_direction: [f32; 2],
-    fov_scale: f32,
+    rot_mutation: [f32; 2],
+    fov_mutation: f32,
     camera_rot_amount: f32,
     fov_scale_amount: f32,
-    zoom: f32,
+    zoom_mutation: f32,
     zoom_scale_amount: f32,
 }
 impl Default for CameraController {
     fn default() -> Self {
         Self {
-            rot_direction: [0.0, 0.0],
-            fov_scale: 0.0,
+            rot_mutation: [0.0, 0.0],
+            fov_mutation: 0.0,
             camera_rot_amount: 0.03,
             fov_scale_amount: 0.05,
-            zoom: 0.0,
+            zoom_mutation: 0.0,
             zoom_scale_amount: 0.0003,
         }
+    }
+}
+
+impl CameraController {
+    fn handle_inputs(&mut self, sdl: &Sdl, image: &mut RotImage) -> (bool, bool) {
+        let rot_amount = self.camera_rot_amount;
+        let fov_scale_amount = self.fov_scale_amount;
+        let zoom_scale_amount = self.zoom_scale_amount;
+        let mut update_camera = false;
+        let mut exit = false;
+        while let Some((event, _timestamp)) = sdl.poll_events() {
+            match event {
+                Event::Quit => {
+                    exit = true;
+                    break;
+                }
+                Event::Key {
+                    pressed,
+                    repeat: 0,
+                    keycode,
+                    ..
+                } => match keycode {
+                    SDLK_LEFT | SDLK_a => {
+                        self.rot_mutation[0] += if pressed { rot_amount } else { -rot_amount };
+                    }
+                    SDLK_RIGHT | SDLK_d => {
+                        self.rot_mutation[0] -= if pressed { rot_amount } else { -rot_amount };
+                    }
+                    SDLK_UP | SDLK_w => {
+                        self.rot_mutation[1] += if pressed { rot_amount } else { -rot_amount };
+                    }
+                    SDLK_DOWN | SDLK_s => {
+                        self.rot_mutation[1] -= if pressed { rot_amount } else { -rot_amount };
+                    }
+                    SDLK_e => {
+                        self.fov_mutation -= if pressed {
+                            fov_scale_amount
+                        } else {
+                            -fov_scale_amount
+                        };
+                    }
+                    SDLK_q => {
+                        self.fov_mutation += if pressed {
+                            fov_scale_amount
+                        } else {
+                            -fov_scale_amount
+                        };
+                    }
+                    SDLK_LEFTBRACKET | SDLK_r => {
+                        self.zoom_mutation -= if pressed {
+                            zoom_scale_amount
+                        } else {
+                            -zoom_scale_amount
+                        };
+                    }
+                    SDLK_RIGHTBRACKET | SDLK_f => {
+                        self.zoom_mutation += if pressed {
+                            zoom_scale_amount
+                        } else {
+                            -zoom_scale_amount
+                        };
+                    }
+                    SDLK_ESCAPE => {
+                        exit = true;
+                        break;
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+        if self.rot_mutation[0] != 0.0
+            || self.rot_mutation[1] != 0.0
+            || self.fov_mutation != 0.0
+            || self.zoom_mutation != 0.0
+        {
+            update_camera = true;
+            image.fov += self.fov_mutation;
+            image.zoom += self.zoom_mutation;
+            image.rotate_viewrays(self.rot_mutation[0], self.rot_mutation[1]);
+        }
+        (update_camera, exit)
     }
 }
 
@@ -197,7 +279,7 @@ fn main() {
         glUniform1i(twin_view_location, if image.twin_view { 1 } else { 0 });
     }
     loop {
-        let (update_camera, exit) = poll_events(&sdl, &mut image, &mut controller);
+        let (update_camera, exit) = controller.handle_inputs(&sdl, &mut image);
         if exit {
             break;
         }
@@ -237,84 +319,4 @@ fn get_shader_variable(str: &str, program_id: u32) -> i32 {
         }
         location
     }
-}
-
-fn poll_events(sdl: &Sdl, image: &mut RotImage, controller: &mut CameraController) -> (bool, bool) {
-    let rot_amount = controller.camera_rot_amount;
-    let fov_scale_amount = controller.fov_scale_amount;
-    let zoom_scale_amount = controller.zoom_scale_amount;
-    let mut update_camera = false;
-    let mut exit = false;
-    while let Some((event, _timestamp)) = sdl.poll_events() {
-        match event {
-            Event::Quit => {
-                exit = true;
-                break;
-            }
-            Event::Key {
-                pressed,
-                repeat: 0,
-                keycode,
-                ..
-            } => match keycode {
-                SDLK_LEFT | SDLK_a => {
-                    controller.rot_direction[0] += if pressed { rot_amount } else { -rot_amount };
-                }
-                SDLK_RIGHT | SDLK_d => {
-                    controller.rot_direction[0] -= if pressed { rot_amount } else { -rot_amount };
-                }
-                SDLK_UP | SDLK_w => {
-                    controller.rot_direction[1] += if pressed { rot_amount } else { -rot_amount };
-                }
-                SDLK_DOWN | SDLK_s => {
-                    controller.rot_direction[1] -= if pressed { rot_amount } else { -rot_amount };
-                }
-                SDLK_e => {
-                    controller.fov_scale -= if pressed {
-                        fov_scale_amount
-                    } else {
-                        -fov_scale_amount
-                    };
-                }
-                SDLK_q => {
-                    controller.fov_scale += if pressed {
-                        fov_scale_amount
-                    } else {
-                        -fov_scale_amount
-                    };
-                }
-                SDLK_LEFTBRACKET | SDLK_r => {
-                    controller.zoom -= if pressed {
-                        zoom_scale_amount
-                    } else {
-                        -zoom_scale_amount
-                    };
-                }
-                SDLK_RIGHTBRACKET | SDLK_f => {
-                    controller.zoom += if pressed {
-                        zoom_scale_amount
-                    } else {
-                        -zoom_scale_amount
-                    };
-                }
-                SDLK_ESCAPE => {
-                    exit = true;
-                    break;
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-    if controller.rot_direction[0] != 0.0
-        || controller.rot_direction[1] != 0.0
-        || controller.fov_scale != 0.0
-        || controller.zoom != 0.0
-    {
-        update_camera = true;
-        image.fov += controller.fov_scale;
-        image.zoom += controller.zoom;
-        image.rotate_viewrays(controller.rot_direction[0], controller.rot_direction[1]);
-    }
-    (update_camera, exit)
 }
