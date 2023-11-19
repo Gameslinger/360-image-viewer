@@ -180,7 +180,7 @@ fn main() {
     let filename = args[1].as_str();
     let mut twin_view = false;
     let mut source_fov = PI;
-    if args[2] == "t" {
+    if args[2] == "t" || args[2] == "twin" {
         twin_view = true;
     } else {
         source_fov = args[2]
