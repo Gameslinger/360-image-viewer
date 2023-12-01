@@ -12,12 +12,17 @@ use nalgebra_glm::{rotate_x_vec3, rotate_y_vec3, vec3};
 use std::env;
 use std::ffi::CString;
 use std::io::Read;
+use std::time::{Duration, Instant};
 use std::{convert::TryInto, mem::size_of, path::Path};
 use std::{f32::consts::PI, fs::File};
 
-use crate::gl_safe::{Buffer, ShaderProgram, VertexArray};
+use crate::{
+    gl_safe::{Buffer, ShaderProgram, VertexArray},
+    video_loader::VideoStream,
+};
 
 mod gl_safe;
+mod video_loader;
 
 type Vertex = [f32; 5];
 
@@ -37,6 +42,7 @@ struct CameraController {
     fov_scale_amount: f32,
     zoom_mutation: f32,
     zoom_scale_amount: f32,
+    pause: bool,
 }
 impl Default for CameraController {
     fn default() -> Self {
@@ -47,6 +53,7 @@ impl Default for CameraController {
             fov_scale_amount: 0.05,
             zoom_mutation: 0.0,
             zoom_scale_amount: 0.0003,
+            pause: false,
         }
     }
 }
@@ -114,6 +121,11 @@ impl CameraController {
                         exit = true;
                         break;
                     }
+                    SDLK_SPACE => {
+                        if pressed {
+                            self.pause = !self.pause;
+                        }
+                    }
                     _ => {}
                 },
                 _ => {}
@@ -178,6 +190,9 @@ impl RotImage {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = args[1].as_str();
+    let is_video = true;
+    let mut video_stream = VideoStream::new(filename, 300).expect("Unable to open video file");
+
     let mut twin_view = false;
     let mut source_fov = PI;
     if args[2] == "t" || args[2] == "twin" {
@@ -259,10 +274,14 @@ fn main() {
     println!("Shader compliation status: {}", shader_program.info_log());
 
     let texture: gl_safe::Texture;
+    let mut frame = video_stream
+        .get_next_frame()
+        .expect("Unable to get first frame of video!");
     unsafe {
         texture = gl_safe::Texture::new();
         texture
-            .load(&Path::new(filename))
+            //.load_file(&Path::new(filename))
+            .load_bytes(frame.width(), frame.height(), frame.data(0))
             .expect("Could not open image and load texture!");
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture.0);
@@ -278,6 +297,12 @@ fn main() {
     unsafe {
         glUniform1i(twin_view_location, if image.twin_view { 1 } else { 0 });
     }
+
+    let mut update_frame = false;
+    let mut start = Instant::now();
+    //TODO: Extract framerate from source video
+    let DESIRED_FPS: f32 = 29.9;
+    let frame_time = Duration::from_secs_f32(1.0 / DESIRED_FPS);
     loop {
         let (update_camera, exit) = controller.handle_inputs(&sdl, &mut image);
         if exit {
@@ -285,7 +310,17 @@ fn main() {
         }
         unsafe {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            if update_camera {
+            let end = Instant::now();
+            let duration = end - start;
+            if duration > frame_time && !controller.pause {
+                texture
+                    .load_bytes(frame.width(), frame.height(), frame.data(0))
+                    .expect("Could not open image and load texture!");
+                update_frame = true;
+                start = Instant::now();
+                frame = video_stream.get_next_frame().unwrap_or(frame);
+            }
+            if update_camera || update_frame {
                 vbo.bind(gl_safe::BufferType::Array);
                 gl_safe::buffer_data(
                     gl_safe::BufferType::Array,
@@ -293,6 +328,7 @@ fn main() {
                     GL_DYNAMIC_DRAW,
                 );
                 Buffer::clear_binding(gl_safe::BufferType::Array);
+                update_frame = false;
             }
             glUniform1f(scalar_location, image.get_scalar());
             glUniform1f(zoom_location, image.zoom);

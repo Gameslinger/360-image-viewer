@@ -288,7 +288,16 @@ impl Texture {
         glBindTexture(GL_TEXTURE_2D, self.0);
     }
 
-    pub unsafe fn load(&self, path: &Path) -> Result<(), ImageError> {
+    pub unsafe fn load_file(&self, path: &Path) -> Result<(), ImageError> {
+        let img = image::open(path)?.into_rgba8();
+        self.load_bytes(img.width(), img.height(), img.as_bytes())
+    }
+    pub unsafe fn load_bytes(
+        &self,
+        img_width: u32,
+        img_height: u32,
+        img_bytes: &[u8],
+    ) -> Result<(), ImageError> {
         self.bind();
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT.0 as i32);
@@ -300,17 +309,16 @@ impl Texture {
         );
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR.0 as i32);
 
-        let img = image::open(path)?.into_rgba8();
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
             GL_RGBA.0 as i32,
-            img.width() as i32,
-            img.height() as i32,
+            img_width as i32,
+            img_height as i32,
             0,
             GL_RGBA,
             GL_UNSIGNED_BYTE,
-            img.as_bytes().as_ptr() as *const _,
+            img_bytes.as_ptr() as *const _,
         );
         glGenerateMipmap(GL_TEXTURE_2D);
         Ok(())
